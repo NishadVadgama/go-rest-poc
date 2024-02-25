@@ -13,11 +13,11 @@ func GetIndexRoute() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Default response
 		var res = models.Response{
-			Message: "Hello from the go API!",
+			Message: "API is live!",
 		}
 
-		w.WriteHeader(http.StatusOK) // set status code
 		w.Header().Add("Content-Type", "application/json") // set response type
+		w.WriteHeader(http.StatusOK) // set status code
 		json.NewEncoder(w).Encode(res) // response
 	}
 }
