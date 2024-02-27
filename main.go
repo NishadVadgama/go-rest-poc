@@ -16,6 +16,18 @@ func main() {
 		fmt.Println("Error while initializing db: ", err.Error())
 		return
 	}
+	// Push schema
+	err = pgdb.PushSchema("./data/schema.sql")
+	if err != nil {
+		fmt.Println("Error while pushing schema: ", err.Error())
+		return
+	}
+	// Seed articles, not working
+	// err = pgdb.SeedArticles()
+	// if err != nil {
+	// 	fmt.Println("Error while seeding articles: ", err.Error())
+	// 	return
+	// }
 
 	// Initialize router
 	var mux = http.NewServeMux()
