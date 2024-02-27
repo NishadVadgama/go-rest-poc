@@ -3,6 +3,7 @@ package controllers
 import (
 	"database/sql"
 	"encoding/json"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -19,7 +20,8 @@ func GetArticlesRoute(conn *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var articles, err = models.GetArticles(conn)
 		if err != nil {
-			utils.JSONResponse(w, http.StatusInternalServerError, models.Response{Message: err.Error()})
+			log.Printf("Error: %v\n", err)
+			utils.JSONResponse(w, http.StatusInternalServerError, models.Response{Message: "Error occurred while fetching articles!"})
 			return
 		}
 
@@ -41,12 +43,11 @@ func CreateArticleRoute(conn *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Make article id
-		article.Id = 1
-		if len(models.Articles) > 0 {
-			article.Id = models.Articles[len(models.Articles)-1].Id + 1
+		err := models.CreateArticle(conn, article)
+		if err != nil {
+			utils.JSONResponse(w, http.StatusInternalServerError, models.Response{Message: "Error occurred while creating article!"})
+			return
 		}
-		models.Articles = append(models.Articles, article)
 
 		// Return response
 		utils.JSONResponse(w, http.StatusOK, models.Response{Message: "Article added successfully!"})
@@ -63,26 +64,28 @@ func GetArticleByIdRoute(conn *sql.DB) http.HandlerFunc {
 		// Parse article id
 		articleId, err := strconv.Atoi(id)
 		if err != nil || articleId == 0 {
+			if err != nil {
+				log.Printf("Error parsing string to integer: %v\n", err)
+			}
 			utils.JSONResponse(w, http.StatusBadRequest, models.Response{Message: "Invalid parameter!"})
 			return
 		}
 
-		// Finding article
-		var index = -1
-		for i, v := range models.Articles {
-			if v.Id == articleId {
-				index = i
-			}
+		// Check if we found article
+		article, err := models.GetArticle(conn, articleId)
+		if err != nil {
+			log.Printf("Error: %v\n", err)
+			utils.JSONResponse(w, http.StatusInternalServerError, models.Response{Message: "Error occurred while finding article!"})
+			return
 		}
 
-		// Check if we found article
-		if index == -1 {
+		if article.Id == 0 {
 			utils.JSONResponse(w, http.StatusNotFound, models.Response{Message: "No article found!"})
 			return
 		}
 
 		// Return article
-		utils.JSONResponse(w, http.StatusOK, models.Articles[index])
+		utils.JSONResponse(w, http.StatusOK, article)
 	}
 }
 
@@ -93,29 +96,26 @@ func DeleteArticleByIdRoute(conn *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var id = r.PathValue("id")
 
+		var (
+			articleId int
+			err       error
+		)
+
 		// Parse article id
-		articleId, err := strconv.Atoi(id)
+		articleId, err = strconv.Atoi(id)
 		if err != nil || articleId == 0 {
+			if err != nil {
+				log.Printf("Error parsing string to integer: %v\n", err)
+			}
 			utils.JSONResponse(w, http.StatusBadRequest, models.Response{Message: "Invalid parameter!"})
 			return
 		}
 
-		// Finding article
-		var index = -1
-		for i, v := range models.Articles {
-			if v.Id == articleId {
-				index = i
-			}
-		}
-
-		// Check if we found article
-		if index == -1 {
-			utils.JSONResponse(w, http.StatusInternalServerError, models.Response{Message: "Unable to delete article!"})
+		err = models.DeleteArticle(conn, articleId)
+		if err != nil {
+			utils.JSONResponse(w, http.StatusInternalServerError, models.Response{Message: "Error occurred while deleting article!"})
 			return
 		}
-
-		// Remove article from a slice
-		models.Articles = append(models.Articles[:index], models.Articles[index+1:]...)
 
 		// Return response
 		utils.JSONResponse(w, http.StatusOK, models.Response{Message: "Article deleted successfully!"})
@@ -129,9 +129,17 @@ func UpdateArticleByIdRoute(conn *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var id = r.PathValue("id")
 
+		var (
+			articleId int
+			err       error
+		)
+
 		// Parse article id
-		articleId, err := strconv.Atoi(id)
+		articleId, err = strconv.Atoi(id)
 		if err != nil || articleId == 0 {
+			if err != nil {
+				log.Printf("Error parsing string to integer: %v\n", err)
+			}
 			utils.JSONResponse(w, http.StatusBadRequest, models.Response{Message: "Invalid parameter!"})
 			return
 		}
@@ -144,24 +152,11 @@ func UpdateArticleByIdRoute(conn *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Finding article
-		var index = -1
-		for i, v := range models.Articles {
-			if v.Id == articleId {
-				index = i
-			}
-		}
-
-		// Check if we found article
-		if index == -1 {
-			utils.JSONResponse(w, http.StatusNotFound, models.Response{Message: "Unable to find article!"})
+		err = models.UpdateArticle(conn, articleId, article)
+		if err != nil {
+			utils.JSONResponse(w, http.StatusInternalServerError, models.Response{Message: "Error occurred while updating article!"})
 			return
 		}
-
-		// Update article
-		models.Articles[index].Title = article.Title
-		models.Articles[index].Description = article.Description
-		models.Articles[index].Tags = article.Tags
 
 		// Return response
 		utils.JSONResponse(w, http.StatusOK, models.Response{Message: "Article updated successfully!"})
