@@ -9,19 +9,28 @@ import (
 )
 
 func main() {
-	mux := http.NewServeMux()
-	
-	// Routes
+	// Init db
+	var pgdb utils.PostgresDB
+	conn, err := pgdb.InitializeDB("user=postgres dbname=go-rest-poc sslmode=disable")
+	if err != nil {
+		fmt.Println("Error while initializing db: ", err.Error())
+		return
+	}
+
+	// Initialize router
+	var mux = http.NewServeMux()
+
+	// Bind Routes
 	//
 	// base route
-	mux.HandleFunc("GET /", utils.Logger(controllers.GetIndexRoute()))
+	mux.HandleFunc("GET /", utils.Handler(controllers.GetIndexRoute()))
 
 	// articles route
-	mux.HandleFunc("GET /articles", utils.Logger(controllers.GetArticlesRoute()))
-	mux.HandleFunc("POST /articles", utils.Logger(controllers.CreateArticleRoute()))
-	mux.HandleFunc("GET /articles/{id}", utils.Logger(controllers.GetArticleByIdRoute()))
-	mux.HandleFunc("DELETE /articles/{id}", utils.Logger(controllers.DeleteArticleByIdRoute()))
-	mux.HandleFunc("PUT /articles/{id}", utils.Logger(controllers.UpdateArticleByIdRoute()))
+	mux.HandleFunc("GET /articles", utils.Handler(controllers.GetArticlesRoute(conn)))
+	mux.HandleFunc("POST /articles", utils.Handler(controllers.CreateArticleRoute(conn)))
+	mux.HandleFunc("GET /articles/{id}", utils.Handler(controllers.GetArticleByIdRoute(conn)))
+	mux.HandleFunc("DELETE /articles/{id}", utils.Handler(controllers.DeleteArticleByIdRoute(conn)))
+	mux.HandleFunc("PUT /articles/{id}", utils.Handler(controllers.UpdateArticleByIdRoute(conn)))
 
 	// Starting listener
 	fmt.Println("Server starting at http://localhost:3333/")
