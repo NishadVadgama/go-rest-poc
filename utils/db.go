@@ -30,7 +30,7 @@ func (pg *PostgresDB) InitializeDB(connectionString string) (*sql.DB, error) {
 		return nil, err
 	}
 
-	log.Println("Database connected!")
+	log.Println("Database connected.")
 	return pg.Instance, nil
 }
 
@@ -85,20 +85,18 @@ func (pg *PostgresDB) SeedArticles() error {
 	}
 
 	// Prepare SQL statement
-	sqlStr := "INSERT INTO articles(title, description) VALUES "
+	log.Println("Seeding articles...")
+	sqlStr := "INSERT INTO articles(title, description, tags) VALUES "
 	values := []interface{}{}
 
 	// Feed in values
-	for _, row := range articles {
-		sqlStr += "(?, ?, ?),"
-		fmt.Printf("%T", row.Tags)
+	for i, row := range articles {
+		sqlStr += fmt.Sprintf("($%d, $%d, $%d),", (i*3)+1, (i*3)+2, (i*3)+3)
 		values = append(values, row.Title, row.Description, row.Tags)
 	}
 
 	// Trim the last ,
 	sqlStr = sqlStr[0 : len(sqlStr)-1]
-	fmt.Print(sqlStr)
-	fmt.Print(values...)
 
 	stmt, err := pg.Instance.Prepare(sqlStr)
 	if err != nil {

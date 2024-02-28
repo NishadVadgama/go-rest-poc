@@ -43,14 +43,17 @@ func CreateArticleRoute(conn *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		err := models.CreateArticle(conn, article)
-		if err != nil {
+		insertedId, err := models.CreateArticle(conn, article)
+		if err != nil || insertedId == 0 {
 			utils.JSONResponse(w, http.StatusInternalServerError, models.Response{Message: "Error occurred while creating article!"})
 			return
 		}
 
+		// Set inserted
+		article.Id = int(insertedId)
+
 		// Return response
-		utils.JSONResponse(w, http.StatusOK, models.Response{Message: "Article added successfully!"})
+		utils.JSONResponse(w, http.StatusOK, article)
 	}
 }
 
@@ -96,13 +99,8 @@ func DeleteArticleByIdRoute(conn *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var id = r.PathValue("id")
 
-		var (
-			articleId int
-			err       error
-		)
-
 		// Parse article id
-		articleId, err = strconv.Atoi(id)
+		articleId, err := strconv.Atoi(id)
 		if err != nil || articleId == 0 {
 			if err != nil {
 				log.Printf("Error parsing string to integer: %v\n", err)
@@ -111,9 +109,14 @@ func DeleteArticleByIdRoute(conn *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		err = models.DeleteArticle(conn, articleId)
+		rowsAffected, err := models.DeleteArticle(conn, articleId)
 		if err != nil {
+			log.Printf("Error: %v\n", err)
 			utils.JSONResponse(w, http.StatusInternalServerError, models.Response{Message: "Error occurred while deleting article!"})
+			return
+		}
+		if rowsAffected == 0 {
+			utils.JSONResponse(w, http.StatusNotFound, models.Response{Message: "No article found, that can be deleted!"})
 			return
 		}
 
@@ -152,8 +155,9 @@ func UpdateArticleByIdRoute(conn *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		err = models.UpdateArticle(conn, articleId, article)
+		_, err = models.UpdateArticle(conn, articleId, article)
 		if err != nil {
+			log.Printf("Error: %v\n", err)
 			utils.JSONResponse(w, http.StatusInternalServerError, models.Response{Message: "Error occurred while updating article!"})
 			return
 		}

@@ -1,7 +1,8 @@
 package main
 
 import (
-	"fmt"
+	"flag"
+	"log"
 	"net/http"
 
 	"github.com/NishadVadgama/go-server-poc/controllers"
@@ -9,25 +10,34 @@ import (
 )
 
 func main() {
+	// For DB seed
+	var shouldDBSeed = flag.Bool("db_seed", false, "Perform database seed?")
+
+	// Parse the flags
+	flag.Parse()
+
 	// Init db
 	var pgdb utils.PostgresDB
 	conn, err := pgdb.InitializeDB("user=postgres dbname=go-rest-poc sslmode=disable")
 	if err != nil {
-		fmt.Println("Error while initializing db: ", err.Error())
+		log.Println("Error while initializing db: ", err.Error())
 		return
 	}
 	// Push schema
 	err = pgdb.PushSchema("./data/schema.sql")
 	if err != nil {
-		fmt.Println("Error while pushing schema: ", err.Error())
+		log.Println("Error while pushing schema: ", err.Error())
 		return
 	}
-	// Seed articles, not working
-	// err = pgdb.SeedArticles()
-	// if err != nil {
-	// 	fmt.Println("Error while seeding articles: ", err.Error())
-	// 	return
-	// }
+
+	// Seed articles
+	if *shouldDBSeed {
+		err = pgdb.SeedArticles()
+		if err != nil {
+			log.Println("Error while seeding articles: ", err.Error())
+			return
+		}
+	}
 
 	// Initialize router
 	var mux = http.NewServeMux()
@@ -45,6 +55,6 @@ func main() {
 	mux.HandleFunc("PUT /articles/{id}", utils.Handler(controllers.UpdateArticleByIdRoute(conn)))
 
 	// Starting listener
-	fmt.Println("Server starting at http://localhost:3333/")
+	log.Println("Server starting at http://localhost:3333/")
 	http.ListenAndServe(":3333", mux)
 }
