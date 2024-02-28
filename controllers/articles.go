@@ -1,203 +1,168 @@
 package controllers
 
 import (
+	"database/sql"
 	"encoding/json"
+	"log"
 	"net/http"
 	"strconv"
 
+	_ "github.com/lib/pq"
+
 	"github.com/NishadVadgama/go-server-poc/models"
+	"github.com/NishadVadgama/go-server-poc/utils"
 )
 
 // Get articles route
 //
 // Route: /articles
-func GetArticlesRoute() http.HandlerFunc {
+func GetArticlesRoute(conn *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Add("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK) 
-		json.NewEncoder(w).Encode(models.Articles)
+		var articles, err = models.GetArticles(conn)
+		if err != nil {
+			log.Printf("Error: %v\n", err)
+			utils.JSONResponse(w, http.StatusInternalServerError, models.Response{Message: "Error occurred while fetching articles!"})
+			return
+		}
+
+		// Return articles
+		utils.JSONResponse(w, http.StatusOK, articles)
 	}
 }
 
 // Create articles route
 //
 // Route: /articles
-func CreateArticleRoute() http.HandlerFunc {
+func CreateArticleRoute(conn *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var article models.Article
-        json.NewDecoder(r.Body).Decode(&article)
-		
+		json.NewDecoder(r.Body).Decode(&article)
+
 		if article.Title == "" {
-			w.Header().Add("Content-Type", "application/json")
-			w.WriteHeader(http.StatusUnprocessableEntity) 
-			json.NewEncoder(w).Encode(models.Response{
-				Message: "Invalid data!",
-			})
+			utils.JSONResponse(w, http.StatusUnprocessableEntity, models.Response{Message: "Invalid data!"})
 			return
 		}
-		
-		// Make article id
-		article.Id = 1
-		if len(models.Articles) > 0 {
-			article.Id = models.Articles[len(models.Articles)-1].Id + 1
-		}
-		models.Articles = append(models.Articles, article)
 
-		w.Header().Add("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK) 
-		json.NewEncoder(w).Encode(models.Response{
-			Message: "Article added successfully!",
-		})
+		insertedId, err := models.CreateArticle(conn, article)
+		if err != nil || insertedId == 0 {
+			utils.JSONResponse(w, http.StatusInternalServerError, models.Response{Message: "Error occurred while creating article!"})
+			return
+		}
+
+		// Set inserted
+		article.Id = int(insertedId)
+
+		// Return response
+		utils.JSONResponse(w, http.StatusOK, article)
 	}
 }
 
 // Get article by id route
 //
 // Route: /articles/{id}
-func GetArticleByIdRoute() http.HandlerFunc {
+func GetArticleByIdRoute(conn *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var id = r.PathValue("id")
 
 		// Parse article id
 		articleId, err := strconv.Atoi(id)
 		if err != nil || articleId == 0 {
-			w.Header().Add("Content-Type", "application/json")
-			w.WriteHeader(http.StatusBadRequest) 
-			json.NewEncoder(w).Encode(models.Response{
-				Message: "Invalid parameter!",
-			})
+			if err != nil {
+				log.Printf("Error parsing string to integer: %v\n", err)
+			}
+			utils.JSONResponse(w, http.StatusBadRequest, models.Response{Message: "Invalid parameter!"})
 			return
 		}
 
-		// Finding article
-		var index = -1
-		for i, v := range models.Articles {
-			if v.Id == articleId {
-				index = i
-			}
+		// Check if we found article
+		article, err := models.GetArticle(conn, articleId)
+		if err != nil {
+			log.Printf("Error: %v\n", err)
+			utils.JSONResponse(w, http.StatusInternalServerError, models.Response{Message: "Error occurred while finding article!"})
+			return
 		}
 
-		// Check if we found article
-		if index == -1 {
-			w.Header().Add("Content-Type", "application/json")
-			w.WriteHeader(http.StatusNotFound) 
-			json.NewEncoder(w).Encode(models.Response{
-				Message: "No article found!",
-			})
+		if article.Id == 0 {
+			utils.JSONResponse(w, http.StatusNotFound, models.Response{Message: "No article found!"})
 			return
 		}
 
 		// Return article
-		w.Header().Add("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK) 
-		json.NewEncoder(w).Encode(models.Articles[index])
+		utils.JSONResponse(w, http.StatusOK, article)
 	}
 }
 
 // Delete article by id route
 //
 // Route: /articles/{id}
-func DeleteArticleByIdRoute() http.HandlerFunc {
+func DeleteArticleByIdRoute(conn *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var id = r.PathValue("id")
 
 		// Parse article id
 		articleId, err := strconv.Atoi(id)
 		if err != nil || articleId == 0 {
-			w.Header().Add("Content-Type", "application/json")
-			w.WriteHeader(http.StatusBadRequest) 
-			json.NewEncoder(w).Encode(models.Response{
-				Message: "Invalid parameter!",
-			})
-			return
-		}
-
-		// Finding article
-		var index = -1
-		for i, v := range models.Articles {
-			if v.Id == articleId {
-				index = i
+			if err != nil {
+				log.Printf("Error parsing string to integer: %v\n", err)
 			}
-		}
-
-		// Check if we found article
-		if index == -1 {
-			w.Header().Add("Content-Type", "application/json")
-			w.WriteHeader(http.StatusNotFound) 
-			json.NewEncoder(w).Encode(models.Response{
-				Message: "Unable to delete article!",
-			})
+			utils.JSONResponse(w, http.StatusBadRequest, models.Response{Message: "Invalid parameter!"})
 			return
 		}
-		
-		// Remove article from a slice
-		models.Articles = append(models.Articles[:index], models.Articles[index+1:]...)
 
-		w.Header().Add("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK) 
-		json.NewEncoder(w).Encode(models.Response{
-			Message: "Article deleted successfully!",
-		})
+		rowsAffected, err := models.DeleteArticle(conn, articleId)
+		if err != nil {
+			log.Printf("Error: %v\n", err)
+			utils.JSONResponse(w, http.StatusInternalServerError, models.Response{Message: "Error occurred while deleting article!"})
+			return
+		}
+		if rowsAffected == 0 {
+			utils.JSONResponse(w, http.StatusNotFound, models.Response{Message: "No article found, that can be deleted!"})
+			return
+		}
+
+		// Return response
+		utils.JSONResponse(w, http.StatusOK, models.Response{Message: "Article deleted successfully!"})
 	}
 }
 
 // Update article by id route
 //
 // Route: /articles/{id}
-func UpdateArticleByIdRoute() http.HandlerFunc {
+func UpdateArticleByIdRoute(conn *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var id = r.PathValue("id")
 
+		var (
+			articleId int
+			err       error
+		)
+
 		// Parse article id
-		articleId, err := strconv.Atoi(id)
+		articleId, err = strconv.Atoi(id)
 		if err != nil || articleId == 0 {
-			w.Header().Add("Content-Type", "application/json")
-			w.WriteHeader(http.StatusBadRequest) 
-			json.NewEncoder(w).Encode(models.Response{
-				Message: "Invalid parameter!",
-			})
+			if err != nil {
+				log.Printf("Error parsing string to integer: %v\n", err)
+			}
+			utils.JSONResponse(w, http.StatusBadRequest, models.Response{Message: "Invalid parameter!"})
 			return
 		}
 
 		// Validate article data
 		var article models.Article
-        json.NewDecoder(r.Body).Decode(&article)
+		json.NewDecoder(r.Body).Decode(&article)
 		if article.Title == "" {
-			w.Header().Add("Content-Type", "application/json")
-			w.WriteHeader(http.StatusUnprocessableEntity) 
-			json.NewEncoder(w).Encode(models.Response{
-				Message: "Invalid data!",
-			})
+			utils.JSONResponse(w, http.StatusUnprocessableEntity, models.Response{Message: "Invalid data!"})
 			return
 		}
 
-		// Finding article
-		var index = -1
-		for i, v := range models.Articles {
-			if v.Id == articleId {
-				index = i
-			}
-		}
-
-		// Check if we found article
-		if index == -1 {
-			w.Header().Add("Content-Type", "application/json")
-			w.WriteHeader(http.StatusNotFound) 
-			json.NewEncoder(w).Encode(models.Response{
-				Message: "Unable to find article!",
-			})
+		_, err = models.UpdateArticle(conn, articleId, article)
+		if err != nil {
+			log.Printf("Error: %v\n", err)
+			utils.JSONResponse(w, http.StatusInternalServerError, models.Response{Message: "Error occurred while updating article!"})
 			return
 		}
-		
-		// Update article
-		models.Articles[index].Title = article.Title
-		models.Articles[index].Description = article.Description
-		models.Articles[index].Tags = article.Tags
-		
-		w.Header().Add("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK) 
-		json.NewEncoder(w).Encode(models.Response{
-			Message: "Article updated successfully!",
-		})
+
+		// Return response
+		utils.JSONResponse(w, http.StatusOK, models.Response{Message: "Article updated successfully!"})
 	}
 }
