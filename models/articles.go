@@ -41,7 +41,7 @@ func GetArticle(conn *sql.DB, id int) (Article, error) {
 	var article = Article{}
 
 	// Fetch article
-	row := conn.QueryRow(`SELECT * from articles WHERE id = $1`, id)
+	row := conn.QueryRow(`SELECT id, title, description, tags from articles WHERE id = $1`, id)
 
 	// Using Scan to assign column data to struct fields
 	err := row.Scan(&article.Id, &article.Title, &article.Description, &article.Tags)
@@ -59,7 +59,7 @@ func GetArticles(conn *sql.DB) ([]Article, error) {
 	var articles = []Article{}
 
 	// Fetch articles
-	rows, err := conn.Query(`SELECT * from articles ORDER BY id DESC`)
+	rows, err := conn.Query(`SELECT id, title, description, tags from articles ORDER BY id DESC`)
 	if err != nil {
 		return articles, err
 	}
