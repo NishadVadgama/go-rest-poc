@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/NishadVadgama/go-server-poc/controllers"
+	"github.com/NishadVadgama/go-server-poc/pkg/config"
 	"github.com/NishadVadgama/go-server-poc/utils"
 )
 
@@ -18,15 +19,9 @@ func main() {
 
 	// Init db
 	var pgdb utils.PostgresDB
-	conn, err := pgdb.InitializeDB("user=postgres dbname=go-rest-poc sslmode=disable")
+	conn, err := pgdb.InitializeDB(config.GetPGConnectionString())
 	if err != nil {
 		log.Println("Error while initializing db: ", err.Error())
-		return
-	}
-	// Push schema
-	err = pgdb.PushSchema("./data/schema.sql")
-	if err != nil {
-		log.Println("Error while pushing schema: ", err.Error())
 		return
 	}
 
@@ -55,6 +50,6 @@ func main() {
 	mux.HandleFunc("PUT /articles/{id}", utils.Handler(controllers.UpdateArticleByIdRoute(conn)))
 
 	// Starting listener
-	log.Println("Server starting at http://localhost:3333/")
-	http.ListenAndServe(":3333", mux)
+	log.Printf("Server starting at http://localhost:%s/\n", config.GetPort())
+	http.ListenAndServe(":"+config.GetPort(), mux)
 }

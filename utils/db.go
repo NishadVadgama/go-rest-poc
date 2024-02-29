@@ -7,7 +7,6 @@ import (
 	"io"
 	"log"
 	"os"
-	"path/filepath"
 
 	"github.com/NishadVadgama/go-server-poc/models"
 	_ "github.com/lib/pq"
@@ -34,34 +33,12 @@ func (pg *PostgresDB) InitializeDB(connectionString string) (*sql.DB, error) {
 	return pg.Instance, nil
 }
 
-// To push schema db
-func (pg *PostgresDB) PushSchema(file string) error {
-	sqlFilePath := filepath.Join(file)
-
-	// Read SQL file
-	sqlBytes, err := os.ReadFile(sqlFilePath)
-	if err != nil {
-		return err
-	}
-
-	// Convert bytes to string
-	sql := string(sqlBytes)
-
-	// Execute SQL statements
-	_, err = pg.Instance.Exec(sql)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
 // Seed articles
 func (pg *PostgresDB) SeedArticles() error {
 	var articles []models.Article
 
 	// Open the JSON file
-	file, err := os.Open("data/sample.json")
+	file, err := os.Open("pkg/db/seed/articles.json")
 	if err != nil {
 		return err
 	}
